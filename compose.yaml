@@ -1,0 +1,25 @@
+services:
+  paperbot:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${NAS_IP:-127.0.0.1}:8080:8080"
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      TAX_RATE: ${TAX_RATE:-0.30}
+      RISK_STOP: ${RISK_STOP:-0.15}
+    volumes:
+      - ./data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
