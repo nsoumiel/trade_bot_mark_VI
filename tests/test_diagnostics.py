@@ -9,6 +9,17 @@ from bot.errors import DataError, diagnostic
 
 
 class DiagnosticTest(unittest.TestCase):
+    def test_http_error_identifies_instrument_without_response_secrets(self):
+        error = HTTPError('https://private-url', 404, 'private-detail', {}, None)
+        with patch('bot.data.urlopen', side_effect=error):
+            with self.assertRaises(DataError) as raised:
+                download('eurusd')
+        public = diagnostic(raised.exception)
+        self.assertEqual(public['code'], 'http_error')
+        self.assertIn('eurusd', public['message'])
+        self.assertIn('404', public['message'])
+        self.assertNotIn('private', public['message'])
+
     def test_html_and_api_key_not_accepted_as_prices(self):
         for body, code in [(b'<html>denied</html>', 'provider_format'),
                            (b'Please provide your API key', 'provider_access'),

@@ -65,3 +65,11 @@ Dans Container Manager > Conteneur > paperbot > Terminal, lancer `python -m bot.
 - `settings_changed` : rétablir les paramètres du compte existant ; ne pas effacer `data` pour traiter un problème réseau.
 
 Le problème précis rencontré sur un NAS ne peut pas être déduit du seul statut générique de la première version. Partager le code et le message du diagnostic permet de choisir la correction adaptée.
+
+### Terminal Synology : « Aucun terminal de télétype trouvé »
+
+Le projet active maintenant `tty: true` et `stdin_open: true` pour allouer un pseudo-terminal. Après modification de `compose.yaml`, recréer le conteneur via le projet Container Manager (arrêter puis reconstruire/redéployer le projet). Un simple redémarrage du conteneur existant ne change pas ces options. Préserver `.env` et `data`.
+
+Dans l'onglet Terminal, choisir la création/l'exécution d'une commande et saisir `/bin/sh`. Le processus principal est Python : s'y attacher directement n'ouvre pas un shell. Une fois le shell ouvert, lancer `python -m bot.diagnose`. Ne pas activer le mode privilégié. Alternative SSH : `sudo docker compose exec paperbot /bin/sh` depuis le dossier du projet.
+
+En cas d'échec HTTP, le tableau affiche aussi le symbole concerné, sans nécessiter de terminal.

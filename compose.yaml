@@ -2,6 +2,8 @@ services:
   paperbot:
     build: .
     restart: unless-stopped
+    tty: true
+    stdin_open: true
     ports:
       - "${NAS_IP:-127.0.0.1}:8080:8080"
     environment:

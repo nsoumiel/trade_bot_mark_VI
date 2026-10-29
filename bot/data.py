@@ -4,14 +4,18 @@ import io
 import math
 from datetime import date, datetime, timezone, timedelta
 from urllib.request import urlopen
+from urllib.error import HTTPError
 from .engine import SYMBOLS, validate
 from .errors import DataError
 
 
 def download(symbol):
     url = 'https://stooq.com/q/d/l/?s='+symbol+'&i=d'
-    with urlopen(url, timeout=30) as response:
-        body = response.read(8_000_000).decode('utf-8-sig')
+    try:
+        with urlopen(url, timeout=30) as response:
+            body = response.read(8_000_000).decode('utf-8-sig')
+    except HTTPError as exc:
+        raise DataError('http_error', f'Stooq retourne HTTP {exc.code} pour {symbol}. Le téléchargement des cours de cet instrument a échoué.') from None
     text = body.lower()
     if 'api key' in text or 'apikey' in text or 'api_key' in text:
         raise DataError('provider_access', 'Stooq demande une clé ou une autorisation d’accès. Les cours gratuits sans clé ne sont pas disponibles dans cette réponse. Ne pas lancer la simulation avec des données inventées.')
