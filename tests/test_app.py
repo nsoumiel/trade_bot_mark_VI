@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 from bot import app
+from bot.errors import DataError
 from test_engine import prices
 
 
@@ -29,4 +30,4 @@ class PersistenceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory, patch.object(app, 'DATA', Path(directory)), patch.object(app, 'notify'), patch.object(app, 'load_remote', return_value=prices(300)), patch.dict('os.environ', {'TAX_RATE': '.30', 'RISK_STOP': '.15'}):
             app.update()
             with patch.dict('os.environ', {'TAX_RATE': '.31'}):
-                with self.assertRaises(ValueError): app.update()
+                with self.assertRaises(DataError): app.update()

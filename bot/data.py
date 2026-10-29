@@ -1,22 +1,36 @@
 """Free daily Stooq observations. USD ETF prices converted to EUR on shared dates."""
 import csv
 import io
+import math
 from datetime import date, datetime, timezone, timedelta
 from urllib.request import urlopen
 from .engine import SYMBOLS, validate
+from .errors import DataError
 
 
 def download(symbol):
     url = 'https://stooq.com/q/d/l/?s='+symbol+'&i=d'
     with urlopen(url, timeout=30) as response:
         body = response.read(8_000_000).decode('utf-8-sig')
+    text = body.lower()
+    if 'api key' in text or 'apikey' in text or 'api_key' in text:
+        raise DataError('provider_access', 'Stooq demande une clé ou une autorisation d’accès. Les cours gratuits sans clé ne sont pas disponibles dans cette réponse. Ne pas lancer la simulation avec des données inventées.')
+    reader = csv.DictReader(io.StringIO(body))
+    if not reader.fieldnames or not {'Date', 'Close'} <= set(reader.fieldnames):
+        raise DataError('provider_format', 'Stooq ne renvoie pas le CSV attendu pour '+symbol+' (réponse vide, page HTML, limitation ou accès refusé).')
     records = {}
-    for row in csv.DictReader(io.StringIO(body)):
+    for row in reader:
         if row.get('Date') and row.get('Close'):
-            day = date.fromisoformat(row['Date'])
-            records[day.isoformat()] = float(row['Close'])
+            try:
+                day = date.fromisoformat(row['Date'])
+                price = float(row['Close'])
+                if not math.isfinite(price) or price <= 0:
+                    raise ValueError()
+            except (ValueError, TypeError):
+                raise DataError('provider_values', 'Cours ou date invalide reçu pour '+symbol) from None
+            records[day.isoformat()] = price
     if not records:
-        raise ValueError('Aucune donnée reçue pour '+symbol)
+        raise DataError('provider_empty', 'Aucun cours reçu pour '+symbol)
     return records
 
 
@@ -33,9 +47,9 @@ def load_remote():
             for d in sorted(shared) if start.isoformat() <= d < today.isoformat() and fx[d] > 0]
     validate(rows)
     if len(rows) < 250:
-        raise ValueError('Historique insuffisant')
+        raise DataError('history_short', 'Historique commun insuffisant : '+str(len(rows))+' séances disponibles, 250 nécessaires. Vérifier SPY, IEF, GLD et EURUSD.')
     if (today-date.fromisoformat(rows[-1]['date'])).days > 5:
-        raise ValueError('Données trop anciennes : simulation non actualisée')
+        raise DataError('history_stale', 'Les derniers cours communs datent du '+rows[-1]['date']+' : historique trop ancien pour actualiser le compte.')
     return rows
 
 

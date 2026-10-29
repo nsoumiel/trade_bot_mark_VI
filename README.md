@@ -48,3 +48,20 @@ DATA_DIR=/tmp/paperbot-data python3 -m bot.app
 Le serveur écoute sur le port 8080. Requêtes internes : `/health`, `/api/status`. Le premier ne valide que le serveur ; le second doit indiquer une actualisation réussie. L'historique CSV personnel est aussi utilisable pour la recherche : `python3 -m bot.backtest prix.csv --tax-rate 0.30`. Colonnes `date,SPY,IEF,GLD`, dates ISO strictement croissantes, prix en EUR positifs, au moins 201 lignes. Les données synthétiques des tests valident le logiciel, jamais la rentabilité.
 
 Dans l'environnement cloud de développement initial, le fournisseur Stooq a retourné un refus HTTP 403 de la politique réseau. Les domaines nécessaires ont été enregistrés dans le brouillon de configuration ; leur activation et une validation sur données réelles restent nécessaires. Le fonctionnement sur le NAS lui-même reste à vérifier après installation.
+
+## Tableau vide ou actualisation échouée
+
+Depuis la version avec diagnostics, le tableau indique un code et une explication sous le statut. Une nouvelle tentative a lieu après cinq minutes en cas d'échec (six heures après un succès). Aucun prix artificiel n'est utilisé pour remplir le tableau.
+
+Pour mettre à jour un projet déjà installé : arrêter le projet dans Container Manager, sauvegarder `data`, remplacer les fichiers du code par ceux de GitHub sans écraser `.env` ni `data`, puis lancer l'action de construction/reconstruction de l'image et redémarrer le projet. Un simple redémarrage ne recharge pas le code copié dans l'image. Recharger ensuite la page du navigateur.
+
+Dans Container Manager > Conteneur > paperbot > Terminal, lancer `python -m bot.diagnose` (ou ouvrir un terminal `/bin/sh`, puis lancer cette commande). Alternative SSH depuis le dossier du projet : `sudo docker compose exec paperbot python -m bot.diagnose`. Ce contrôle teste l'écriture dans /data, chaque instrument Stooq et l'historique commun, sans transaction ni message Telegram. Il peut prendre plusieurs minutes en cas de timeouts. Les messages ne contiennent ni secrets, ni corps brut des réponses externes.
+
+- `storage_permission` : donner à l'UID/GID 1000:1000 l'accès en écriture au dossier `data` via les permissions/ACL DSM. Ne pas modifier tout le dossier partagé ni supprimer le compte.
+- `dns_error`, `network_error`, `network_timeout` : vérifier l'accès Internet, les DNS et les sorties HTTPS du conteneur.
+- `tls_error` : vérifier l'heure du NAS et ses certificats ; conserver la validation TLS.
+- `http_error`, `provider_format`, `provider_empty`, `provider_access` : le fournisseur ne livre pas les données attendues. Une clé ou un autre fournisseur peut être nécessaire selon sa réponse ; le bot ne contourne pas les restrictions d'accès.
+- `history_short` ou `history_stale` : historique incomplet ou trop ancien ; le compte attend des cours valides.
+- `settings_changed` : rétablir les paramètres du compte existant ; ne pas effacer `data` pour traiter un problème réseau.
+
+Le problème précis rencontré sur un NAS ne peut pas être déduit du seul statut générique de la première version. Partager le code et le message du diagnostic permet de choisir la correction adaptée.
