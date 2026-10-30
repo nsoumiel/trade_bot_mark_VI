@@ -10,13 +10,13 @@ Prototype de recherche et de paper trading pour Synology DS218+ (Intel amd64), D
 4. Dans Container Manager > Projet, créer un projet à partir du dossier contenant `compose.yaml`, puis le construire et le démarrer. Alternative SSH dans ce dossier : `sudo docker compose up -d --build`.
 5. Ouvrir le port 8080 à l'adresse privée du NAS depuis le réseau local. Le tableau doit afficher « Actualisé » et une date de séance récente. Le statut Docker « healthy » confirme seulement le serveur HTTP, pas les données financières.
 
-Ne pas exposer le port à Internet, QuickConnect ou une redirection de routeur. Tableau sans authentification, prévu pour un réseau local de confiance. Autoriser les sorties HTTPS vers `stooq.com` et, pour les notifications, `api.telegram.org`. Ne jamais désactiver la vérification TLS. Le téléchargement initial peut prendre quelques minutes. Les erreurs réseau laissent visibles les dernières données avec un avertissement.
+Ne pas exposer le port à Internet, QuickConnect ou une redirection de routeur. Tableau sans authentification, prévu pour un réseau local de confiance. Autoriser les sorties HTTPS vers `data.alpaca.markets` et `www.ecb.europa.eu` et, pour les notifications, `api.telegram.org`. Ne jamais désactiver la vérification TLS. Le téléchargement initial peut prendre quelques minutes. Les erreurs réseau laissent visibles les dernières données avec un avertissement.
 
 Les notifications ne sont envoyées qu'aux nouveaux trades et au premier arrêt de risque. Aucun secret Telegram n'est nécessaire pour démarrer. Aucun chatbot de commande entrante n'est implémenté. Les erreurs Telegram sont journalisées sans token ; pas de relance automatique ni garantie de livraison.
 
 ## Fonctionnement
 
-Capital 10 000 EUR. Univers de recherche : SPY (actions US), IEF (obligations US), GLD (or). Cours quotidiens gratuits Stooq en USD, divisés par EURUSD de la même date. Les ETF US ne constituent pas une recommandation d'achat et peuvent être inaccessibles à un particulier UE : une future utilisation réelle devra choisir et tester des équivalents UCITS/ETC disponibles chez le courtier.
+Capital 10 000 EUR. Univers de recherche : SPY (actions US), IEF (obligations US), GLD (or). Cours quotidiens Alpaca en USD (flux IEX, ajustement des splits), divisés par le taux de référence USD par EUR de la BCE de la même date. Seules les dates communes sont conservées, sans inventer de taux les jours absents. IEX couvre une seule place de marché et ne représente pas le marché consolidé SIP. Les distributions ne sont pas réinvesties. Les ETF US ne constituent pas une recommandation d'achat et peuvent être inaccessibles à un particulier UE : une future utilisation réelle devra choisir et tester des équivalents UCITS/ETC disponibles chez le courtier.
 
 Au premier démarrage, le compte commence à la dernière séance terminée disponible, avec 200 séances de préchauffage. Tous les six heures, les séances supplémentaires sont ajoutées ; aucune séance UTC en cours n'est utilisée. Les données déjà consommées sont figées. La stratégie choisit chaque début de mois l'instrument au meilleur rendement sur 63 séances, positif et au-dessus de sa moyenne sur 200 séances. Sinon elle reste en liquidités. Signaux calculés sur la séance précédente et exécution simulée à la clôture suivante. Investissement de 50 % du capital disponible à chaque changement d'instrument, sans levier ni vente à découvert ; pas de rééquilibrage si l'instrument reste le même.
 
@@ -47,7 +47,19 @@ DATA_DIR=/tmp/paperbot-data python3 -m bot.app
 
 Le serveur écoute sur le port 8080. Requêtes internes : `/health`, `/api/status`. Le premier ne valide que le serveur ; le second doit indiquer une actualisation réussie. L'historique CSV personnel est aussi utilisable pour la recherche : `python3 -m bot.backtest prix.csv --tax-rate 0.30`. Colonnes `date,SPY,IEF,GLD`, dates ISO strictement croissantes, prix en EUR positifs, au moins 201 lignes. Les données synthétiques des tests valident le logiciel, jamais la rentabilité.
 
-Dans l'environnement cloud de développement initial, le fournisseur Stooq a retourné un refus HTTP 403 de la politique réseau. Les domaines nécessaires ont été enregistrés dans le brouillon de configuration ; leur activation et une validation sur données réelles restent nécessaires. Le fonctionnement sur le NAS lui-même reste à vérifier après installation.
+### Configuration Alpaca
+
+Stooq a été remplacé après des erreurs HTTP et des contrôles JavaScript à la place des CSV. L'application interroge uniquement `data.alpaca.markets` pour les données historiques IEX ; elle ne transmet aucun ordre à Alpaca, même au compte paper. La simulation reste locale.
+
+Dans votre `.env` existant, conserver `APCA_API_KEY_ID` et `APCA_API_SECRET_KEY`. Ne jamais partager ces valeurs. Compose transmet désormais ces deux variables au conteneur. Pour un lancement Python direct, les exporter dans le shell : Python ne charge pas automatiquement `.env`.
+
+Après mise à jour, arrêter et reconstruire/recréer le projet dans Container Manager, en préservant `.env` et `data`. Alternative SSH : `sudo docker compose up -d --build --force-recreate`. Un simple redémarrage ne recharge ni le code ni les variables Compose. Lancer ensuite `python -m bot.diagnose` dans le conteneur et vérifier « Actualisé » dans le tableau.
+
+Autoriser HTTPS vers `data.alpaca.markets` et `www.ecb.europa.eu`, en conservant TLS. Les clés doivent autoriser les données historiques IEX ; aucun abonnement SIP n'est supposé. Les refus 401/403, données absentes ou formats invalides sont signalés explicitement.
+
+Les données consommées d'un compte existant restent figées : seuls les jours suivants utilisent Alpaca/BCE. Ce compte mélange donc les anciennes et nouvelles sources ; le backtest utilise la nouvelle source. Pour une recherche indépendante, archiver les données à l'arrêt et choisir volontairement un nouveau dossier, sans supprimer l'ancien compte.
+
+La validation cloud utilise des réponses simulées, car les clés de votre NAS n'y sont pas disponibles. L'accès réel aux données et le déploiement NAS restent à valider après reconstruction.
 
 ## Tableau vide ou actualisation échouée
 
@@ -55,7 +67,7 @@ Depuis la version avec diagnostics, le tableau indique un code et une explicatio
 
 Pour mettre à jour un projet déjà installé : arrêter le projet dans Container Manager, sauvegarder `data`, remplacer les fichiers du code par ceux de GitHub sans écraser `.env` ni `data`, puis lancer l'action de construction/reconstruction de l'image et redémarrer le projet. Un simple redémarrage ne recharge pas le code copié dans l'image. Recharger ensuite la page du navigateur.
 
-Dans Container Manager > Conteneur > paperbot > Terminal, lancer `python -m bot.diagnose` (ou ouvrir un terminal `/bin/sh`, puis lancer cette commande). Alternative SSH depuis le dossier du projet : `sudo docker compose exec paperbot python -m bot.diagnose`. Ce contrôle teste l'écriture dans /data, chaque instrument Stooq et l'historique commun, sans transaction ni message Telegram. Il peut prendre plusieurs minutes en cas de timeouts. Les messages ne contiennent ni secrets, ni corps brut des réponses externes.
+Dans Container Manager > Conteneur > paperbot > Terminal, lancer `python -m bot.diagnose` (ou ouvrir un terminal `/bin/sh`, puis lancer cette commande). Alternative SSH depuis le dossier du projet : `sudo docker compose exec paperbot python -m bot.diagnose`. Ce contrôle teste l'écriture dans /data, chaque instrument Alpaca, le change BCE et l'historique commun, sans transaction ni message Telegram. Il peut prendre plusieurs minutes en cas de timeouts. Les messages ne contiennent ni secrets, ni corps brut des réponses externes.
 
 - `storage_permission` : donner à l'UID/GID 1000:1000 l'accès en écriture au dossier `data` via les permissions/ACL DSM. Ne pas modifier tout le dossier partagé ni supprimer le compte.
 - `dns_error`, `network_error`, `network_timeout` : vérifier l'accès Internet, les DNS et les sorties HTTPS du conteneur.

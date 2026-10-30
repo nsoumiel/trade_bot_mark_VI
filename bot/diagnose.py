@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 from datetime import datetime, timezone
-from .data import download, load_remote
+from .data import download, download_fx, load_remote
 from .errors import diagnostic
 
 
@@ -14,7 +14,8 @@ def main():
     folder = Path(os.getenv('DATA_DIR', '/data'))
     steps = [('stockage /data', lambda: check_storage(folder))]
     steps += [(symbol, lambda s=symbol: len(download(s)))
-              for symbol in ('spy.us', 'ief.us', 'gld.us', 'eurusd')]
+              for symbol in ('SPY', 'IEF', 'GLD')]
+    steps += [('BCE EUR/USD', lambda: len(download_fx()))]
     steps += [('historique commun en EUR', lambda: len(load_remote()))]
     for name, check in steps:
         try:

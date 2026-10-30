@@ -9,3 +9,10 @@
 - Brouillon cloud enregistré : install_script, start_skill, accès stooq.com et api.telegram.org. Activation/publication non effectuées.
 
 Ce prototype ne prouve pas une rentabilité après fiscalité. Voir les limites sur les distributions, l'ajustement des cours et l'absence de validation indépendante dans README.md.
+
+## Migration Alpaca — 30 octobre 2026
+
+- 17 tests réussis : en-têtes d’authentification, flux IEX, pagination, refus d’accès sans fuite de secrets, JSON invalide, change BCE, conversion EUR et exclusion du jour courant ; persistance et moteur toujours validés.
+- Les trois anciens tests du lecteur CSV Stooq sont remplacés par les tests Alpaca/BCE.
+- Les clés du NAS ne sont pas disponibles dans le cloud : aucun accès Alpaca authentifié réel ni déploiement NAS validé. Aucun ordre ni message Telegram envoyé.
+- Documentation officielle Alpaca inaccessible depuis la politique réseau cloud (HTTP 403) ; le contrat du connecteur doit aussi être confirmé par le diagnostic réel sur NAS.

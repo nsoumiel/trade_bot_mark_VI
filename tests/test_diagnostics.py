@@ -9,29 +9,6 @@ from bot.errors import DataError, diagnostic
 
 
 class DiagnosticTest(unittest.TestCase):
-    def test_http_error_identifies_instrument_without_response_secrets(self):
-        error = HTTPError('https://private-url', 404, 'private-detail', {}, None)
-        with patch('bot.data.urlopen', side_effect=error):
-            with self.assertRaises(DataError) as raised:
-                download('eurusd')
-        public = diagnostic(raised.exception)
-        self.assertEqual(public['code'], 'http_error')
-        self.assertIn('eurusd', public['message'])
-        self.assertIn('404', public['message'])
-        self.assertNotIn('private', public['message'])
-
-    def test_html_and_api_key_not_accepted_as_prices(self):
-        for body, code in [(b'<html>denied</html>', 'provider_format'),
-                           (b'Please provide your API key', 'provider_access'),
-                           (b'Date,Close\n2026-01-01,nan\n', 'provider_values')]:
-            with patch('bot.data.urlopen', return_value=io.BytesIO(body)):
-                with self.assertRaises(DataError) as raised: download('spy.us')
-            self.assertEqual(raised.exception.code, code)
-
-    def test_csv_parses(self):
-        with patch('bot.data.urlopen', return_value=io.BytesIO(b'Date,Close\n2026-01-01,100\n')):
-            self.assertEqual(download('spy.us'), {'2026-01-01': 100.})
-
     def test_errors_never_publish_exception_secrets(self):
         for exc in [HTTPError('https://secret-token', 403, 'secret-token', {}, None),
                     URLError('secret-token'), RuntimeError('secret-token'),
